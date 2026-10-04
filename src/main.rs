@@ -101,6 +101,10 @@ fn main() {
                         waveform = Waveform::Square;
                         log::info!("waveform: square");
                     }
+                    19 => {
+                        waveform = Waveform::Triangle;
+                        log::info!("waveform: triangle");
+                    }
                     _ => {}
                 }
             }

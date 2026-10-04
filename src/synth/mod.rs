@@ -42,6 +42,7 @@ pub enum Waveform {
     Saw,
     Sine,
     Square,
+    Triangle,
 }
 
 impl Waveform {
@@ -51,6 +52,7 @@ impl Waveform {
             Waveform::Saw => phase * 2.0 - 1.0,
             Waveform::Sine => (phase * TAU).sin(),
             Waveform::Square => phase.round() * 2.0 - 1.0,
+            Waveform::Triangle => 4.0 * if phase < 0.5 { phase } else { 1.0 - phase } - 1.0,
         }
     }
 }
