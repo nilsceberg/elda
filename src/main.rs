@@ -1,10 +1,10 @@
 use std::{collections::HashMap, ffi::CString};
 
-use alsa::seq::{Addr, EvNote, EventType, PortCap, PortSubscribe, PortType};
+use alsa::seq::{Addr, EvCtrl, EvNote, EventType, PortCap, PortSubscribe, PortType};
 use clap::Parser;
 use elda::{
     sink::alsa::AlsaSink,
-    synth::{DurationEnvelope, Oscillator, OscillatorFunction, RealTimeVoice},
+    synth::{DurationEnvelope, Oscillator, RealTimeVoice, Waveform},
 };
 
 #[derive(Parser)]
@@ -58,6 +58,7 @@ fn main() {
         seq.subscribe_port(&subscribe).unwrap();
     }
 
+    let mut waveform = Waveform::Saw;
     while let Ok(event) = input.event_input() {
         log::info!("input: {:?}", event);
 
@@ -67,7 +68,7 @@ fn main() {
                 let base_frequency = 440.0;
                 let delta = data.note as i32 - 57;
                 let frequency = base_frequency * 2f64.powf(delta as f64 / 12.0);
-                let note = Oscillator::new(OscillatorFunction::Sine, frequency);
+                let note = Oscillator::new(waveform, frequency);
                 voices
                     .get()
                     .insert(data.note, DurationEnvelope::new(note, 1.0));
@@ -75,6 +76,24 @@ fn main() {
             EventType::Noteoff => {
                 let data: EvNote = event.get_data().unwrap();
                 log::info!("removed: {:?}", voices.get().remove(&data.note).is_some());
+            }
+            EventType::Controller => {
+                let data: EvCtrl = event.get_data().unwrap();
+                match data.param {
+                    14 => {
+                        waveform = Waveform::Saw;
+                        log::info!("waveform: saw");
+                    }
+                    16 => {
+                        waveform = Waveform::Sine;
+                        log::info!("waveform: sine");
+                    }
+                    18 => {
+                        waveform = Waveform::Square;
+                        log::info!("waveform: square");
+                    }
+                    _ => {}
+                }
             }
             _ => {}
         }

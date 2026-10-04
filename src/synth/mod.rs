@@ -37,25 +37,26 @@ pub struct Track {
     voices: Vec<Box<dyn Voice>>,
 }
 
-pub enum OscillatorFunction {
+#[derive(Clone, Copy)]
+pub enum Waveform {
     Saw,
     Sine,
     Square,
 }
 
-impl OscillatorFunction {
+impl Waveform {
     fn sample(&self, phase: f64) -> f64 {
         match self {
             // Since the phase is between 0 and 1, it's already a sawtooth wave.
-            OscillatorFunction::Saw => phase,
-            OscillatorFunction::Sine => (phase * TAU).sin(),
-            OscillatorFunction::Square => phase.round(),
+            Waveform::Saw => phase * 2.0 - 1.0,
+            Waveform::Sine => (phase * TAU).sin(),
+            Waveform::Square => phase.round() * 2.0 - 1.0,
         }
     }
 }
 
 pub struct Oscillator {
-    function: OscillatorFunction,
+    waveform: Waveform,
     frequency: f64,
     phase: f64,
 }
@@ -78,9 +79,9 @@ impl Voice for Track {
 }
 
 impl Oscillator {
-    pub fn new(function: OscillatorFunction, frequency: f64) -> Self {
+    pub fn new(waveform: Waveform, frequency: f64) -> Self {
         Oscillator {
-            function,
+            waveform,
             frequency,
             phase: 0.0,
         }
@@ -89,7 +90,7 @@ impl Oscillator {
 
 impl Voice for Oscillator {
     fn sample(&mut self, dt: f64) -> Option<Sample> {
-        let sample = self.function.sample(self.phase);
+        let sample = self.waveform.sample(self.phase);
         self.phase = (self.phase + dt * self.frequency).fract();
         Some(sample as Sample)
     }
