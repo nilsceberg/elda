@@ -4,7 +4,7 @@ use alsa::seq::{Addr, EvNote, EventType, PortCap, PortSubscribe, PortType};
 use clap::Parser;
 use elda::{
     sink::alsa::AlsaSink,
-    synth::{Oscillator, RealTimeVoice},
+    synth::{Oscillator, OscillatorFunction, RealTimeVoice},
 };
 
 #[derive(Parser)]
@@ -67,7 +67,10 @@ fn main() {
                 let base_frequency = 440.0;
                 let delta = data.note as i32 - 57;
                 let frequency = base_frequency * 2f64.powf(delta as f64 / 12.0);
-                track.get().insert(data.note, Oscillator::new(frequency));
+                track.get().insert(
+                    data.note,
+                    Oscillator::new(OscillatorFunction::Saw, frequency),
+                );
             }
             EventType::Noteoff => {
                 let data: EvNote = event.get_data().unwrap();
