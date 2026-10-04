@@ -72,7 +72,7 @@ fn run(device_name: String, mut voice: impl Voice, stop: Arc<AtomicBool>) {
 
     let io = device.io_i16().unwrap();
     let mut data = Vec::<i16>::with_capacity(frames_per_period as usize);
-    let dt = 1.0 / exact_rate as f32;
+    let dt = 1.0 / exact_rate as f64;
     let gain = (i16::MAX / 6) as f32;
     while !stop.load(Ordering::Relaxed) {
         data.clear();

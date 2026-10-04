@@ -4,7 +4,7 @@ use alsa::seq::{Addr, EvNote, EventType, PortCap, PortSubscribe, PortType};
 use clap::Parser;
 use elda::{
     sink::alsa::AlsaSink,
-    synth::{Oscillator, OscillatorFunction, RealTimeVoice},
+    synth::{DurationEnvelope, Oscillator, OscillatorFunction, RealTimeVoice},
 };
 
 #[derive(Parser)]
@@ -24,8 +24,8 @@ fn main() {
 
     let args = Args::parse();
 
-    let track = RealTimeVoice::new(HashMap::<u8, Oscillator>::new());
-    let _sink = AlsaSink::new(args.pcm_name, track.clone());
+    let voices = RealTimeVoice::new(HashMap::<u8, DurationEnvelope<Oscillator>>::new());
+    let _sink = AlsaSink::new(args.pcm_name, voices.clone());
 
     let seq = alsa::Seq::open(None, None, false).unwrap();
     seq.set_client_name(&CString::new("elda").unwrap()).unwrap();
@@ -67,14 +67,14 @@ fn main() {
                 let base_frequency = 440.0;
                 let delta = data.note as i32 - 57;
                 let frequency = base_frequency * 2f64.powf(delta as f64 / 12.0);
-                track.get().insert(
-                    data.note,
-                    Oscillator::new(OscillatorFunction::Saw, frequency),
-                );
+                let note = Oscillator::new(OscillatorFunction::Sine, frequency);
+                voices
+                    .get()
+                    .insert(data.note, DurationEnvelope::new(note, 1.0));
             }
             EventType::Noteoff => {
                 let data: EvNote = event.get_data().unwrap();
-                track.get().remove(&data.note);
+                log::info!("removed: {:?}", voices.get().remove(&data.note).is_some());
             }
             _ => {}
         }

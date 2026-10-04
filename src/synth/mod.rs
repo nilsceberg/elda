@@ -7,7 +7,30 @@ use std::{
 pub type Sample = f32;
 
 pub trait Voice: Send {
-    fn sample(&mut self, dt: f32) -> Option<Sample>;
+    fn sample(&mut self, dt: f64) -> Option<Sample>;
+}
+
+pub struct DurationEnvelope<V> {
+    pub voice: V,
+    pub duration: f64,
+}
+
+impl<V> DurationEnvelope<V> {
+    pub fn new(voice: V, duration: f64) -> Self {
+        Self { voice, duration }
+    }
+}
+
+impl<V: Voice> Voice for DurationEnvelope<V> {
+    fn sample(&mut self, dt: f64) -> Option<Sample> {
+        if self.duration <= 0.0 {
+            None
+        } else {
+            let sample = self.voice.sample(dt);
+            self.duration -= dt;
+            sample
+        }
+    }
 }
 
 pub struct Track {
@@ -44,7 +67,7 @@ impl From<Vec<Box<dyn Voice>>> for Track {
 }
 
 impl Voice for Track {
-    fn sample(&mut self, dt: f32) -> Option<Sample> {
+    fn sample(&mut self, dt: f64) -> Option<Sample> {
         Some(
             self.voices
                 .iter_mut()
@@ -65,9 +88,9 @@ impl Oscillator {
 }
 
 impl Voice for Oscillator {
-    fn sample(&mut self, dt: f32) -> Option<Sample> {
+    fn sample(&mut self, dt: f64) -> Option<Sample> {
         let sample = self.function.sample(self.phase);
-        self.phase = (self.phase + dt as f64 * self.frequency).fract();
+        self.phase = (self.phase + dt * self.frequency).fract();
         Some(sample as Sample)
     }
 }
@@ -97,19 +120,43 @@ impl<V> RealTimeVoice<V> {
 }
 
 impl<V: Voice> Voice for RealTimeVoice<V> {
-    fn sample(&mut self, dt: f32) -> Option<Sample> {
+    fn sample(&mut self, dt: f64) -> Option<Sample> {
         self.get().sample(dt)
     }
 }
 
 impl Voice for Box<dyn Voice> {
-    fn sample(&mut self, dt: f32) -> Option<Sample> {
+    fn sample(&mut self, dt: f64) -> Option<Sample> {
         self.as_mut().sample(dt)
     }
 }
 
+impl<V: Voice> Voice for Vec<V> {
+    fn sample(&mut self, dt: f64) -> Option<Sample> {
+        let mut sample = 0.0;
+        self.retain_mut(|v| {
+            if let Some(s) = v.sample(dt) {
+                sample += s;
+                true
+            } else {
+                false
+            }
+        });
+        Some(sample)
+    }
+}
+
 impl<K: Send, V: Voice> Voice for HashMap<K, V> {
-    fn sample(&mut self, dt: f32) -> Option<Sample> {
-        Some(self.values_mut().filter_map(|v| v.sample(dt)).sum())
+    fn sample(&mut self, dt: f64) -> Option<Sample> {
+        let mut sample = 0.0;
+        self.retain(|_, v| {
+            if let Some(s) = v.sample(dt) {
+                sample += s;
+                true
+            } else {
+                false
+            }
+        });
+        Some(sample)
     }
 }
