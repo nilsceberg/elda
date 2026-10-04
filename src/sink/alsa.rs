@@ -14,7 +14,7 @@ pub struct AlsaSink {
 }
 
 impl AlsaSink {
-    pub fn new(device_name: String, voice: impl Voice + 'static) -> Self {
+    pub fn new(device_name: String, voice: impl Voice + Send + 'static) -> Self {
         let stop = Arc::new(AtomicBool::new(false));
         let handle = Some({
             let stop = stop.clone();

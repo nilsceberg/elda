@@ -6,7 +6,7 @@ use std::{
 
 pub type Sample = f32;
 
-pub trait Voice: Send {
+pub trait Voice {
     fn sample(&mut self, dt: f64) -> Option<Sample>;
 }
 
