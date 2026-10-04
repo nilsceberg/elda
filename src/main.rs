@@ -4,7 +4,7 @@ use alsa::seq::{Addr, EvCtrl, EvNote, EventType, PortCap, PortSubscribe, PortTyp
 use clap::Parser;
 use elda::{
     sink::alsa::AlsaSink,
-    synth::{DurationEnvelope, Oscillator, RealTimeVoice, Waveform},
+    synth::{AdsrEnvelope, Oscillator, RealTimeVoice, Waveform},
 };
 
 #[derive(Parser)]
@@ -24,7 +24,7 @@ fn main() {
 
     let args = Args::parse();
 
-    let voices = RealTimeVoice::new(HashMap::<u8, DurationEnvelope<Oscillator>>::new());
+    let voices = RealTimeVoice::new(HashMap::<u8, _>::new());
     let _sink = AlsaSink::new(args.pcm_name, voices.clone());
 
     let seq = alsa::Seq::open(None, None, false).unwrap();
@@ -66,18 +66,23 @@ fn main() {
         match event.get_type() {
             EventType::Noteon => {
                 let data: EvNote = event.get_data().unwrap();
-                let base_frequency = 440.0;
-                let delta = data.note as i32 - 57;
-                let frequency = base_frequency * 2f64.powf(delta as f64 / 12.0);
-                let mut note = Oscillator::new(waveform, frequency, data.velocity as f64 / 100.0);
-                note.transpose = transpose;
-                voices
-                    .get()
-                    .insert(data.note, DurationEnvelope::new(note, 10.0));
+                let mut voices = voices.get();
+                let note = voices.entry(data.note).or_insert_with(|| {
+                    let base_frequency = 440.0;
+                    let delta = data.note as i32 - 57;
+                    let frequency = base_frequency * 2f64.powf(delta as f64 / 12.0);
+                    let mut note = Oscillator::new(waveform, frequency, 1.0);
+                    note.transpose = transpose;
+                    AdsrEnvelope::new(note, 0.01, 0.7, 0.2, 0.5)
+                });
+                note.voice.amplitude = data.velocity as f64 / 64.0;
+                note.attack();
             }
             EventType::Noteoff => {
                 let data: EvNote = event.get_data().unwrap();
-                log::info!("removed: {:?}", voices.get().remove(&data.note).is_some());
+                if let Some(envelope) = voices.get().get_mut(&data.note) {
+                    envelope.release();
+                }
             }
             EventType::Pitchbend => {
                 let data: EvCtrl = event.get_data().unwrap();
@@ -107,6 +112,7 @@ fn main() {
                     }
                     _ => {}
                 }
+                voices.get().clear();
             }
             _ => {}
         }

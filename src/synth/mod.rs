@@ -15,6 +15,107 @@ pub struct DurationEnvelope<V> {
     pub duration: f64,
 }
 
+pub type Duration = f64;
+pub type Gain = f64;
+
+pub enum AdsrPhase {
+    Silent,
+    Attack(Gain, f64),
+    Decay(Gain, f64),
+    Sustain,
+    Release(Gain, f64),
+}
+
+pub struct AdsrEnvelope<V> {
+    pub voice: V,
+    phase: AdsrPhase,
+    attack: Duration,
+    decay: Duration,
+    sustain: Gain,
+    release: Duration,
+    amplitude: Gain,
+}
+
+impl<V> AdsrEnvelope<V> {
+    pub fn new(
+        voice: V,
+        attack: Duration,
+        decay: Duration,
+        sustain: Gain,
+        release: Duration,
+    ) -> Self {
+        AdsrEnvelope {
+            voice,
+            phase: AdsrPhase::Silent,
+            amplitude: 0.0,
+            attack,
+            decay,
+            sustain,
+            release,
+        }
+    }
+
+    pub fn attack(&mut self) {
+        self.phase = AdsrPhase::Attack(self.amplitude, 0.0);
+    }
+
+    pub fn release(&mut self) {
+        self.phase = AdsrPhase::Release(self.amplitude, 0.0);
+    }
+}
+
+fn lerp(a: f64, b: f64, t: f64) -> f64 {
+    let t = t.clamp(0.0, 1.0);
+    a * (1.0 - t) + b * t
+}
+
+impl<V: Voice> Voice for AdsrEnvelope<V> {
+    fn sample(&mut self, dt: f64) -> Option<Sample> {
+        let sample = self.voice.sample(dt)?;
+
+        match &mut self.phase {
+            AdsrPhase::Silent => {
+                self.amplitude = 0.0;
+            }
+            AdsrPhase::Attack(from, time) => {
+                let t = *time / self.attack;
+                self.amplitude = lerp(*from, 1.0, t);
+
+                if t >= 1.0 {
+                    self.phase = AdsrPhase::Decay(self.amplitude, 0.0);
+                } else {
+                    *time += dt;
+                }
+            }
+            AdsrPhase::Decay(from, time) => {
+                let t = *time / self.decay;
+                self.amplitude = lerp(*from, self.sustain, t);
+
+                if t >= 1.0 {
+                    self.phase = AdsrPhase::Sustain;
+                } else {
+                    *time += dt;
+                }
+            }
+            AdsrPhase::Sustain => {
+                self.amplitude = self.sustain;
+            }
+            AdsrPhase::Release(from, time) => {
+                let t = *time / self.release;
+                self.amplitude = lerp(*from, 0.0, t);
+
+                if t >= 1.0 {
+                    self.phase = AdsrPhase::Silent;
+                } else {
+                    *time += dt;
+                }
+            }
+        };
+
+        Some(sample * self.amplitude as f32)
+    }
+}
+
 impl<V> DurationEnvelope<V> {
     pub fn new(voice: V, duration: f64) -> Self {
         Self { voice, duration }

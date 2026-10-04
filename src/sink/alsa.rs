@@ -51,7 +51,7 @@ fn run(device_name: String, mut voice: impl Voice, stop: Arc<AtomicBool>) {
         .unwrap();
     log::info!("set sampling rate to {} Hz", exact_rate);
 
-    let period_size = 256;
+    let period_size = 512;
     let num_periods = 2;
     let num_channels = 2;
     let frame_size = num_channels * 2;
