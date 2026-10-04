@@ -1,10 +1,10 @@
-use std::ffi::CString;
+use std::{collections::HashMap, ffi::CString};
 
-use alsa::seq::{Addr, Connect, PortCap, PortInfo, PortSubscribe, PortType};
+use alsa::seq::{Addr, EvNote, EventType, PortCap, PortSubscribe, PortType};
 use clap::Parser;
 use elda::{
     sink::alsa::AlsaSink,
-    synth::{Oscillator, RealTimeVoice, Track, Voice},
+    synth::{Oscillator, RealTimeVoice},
 };
 
 #[derive(Parser)]
@@ -24,13 +24,8 @@ fn main() {
 
     let args = Args::parse();
 
-    let track = RealTimeVoice::new(Track::from(vec![
-        //Box::new(Oscillator::new(440.0)) as Box<dyn Voice>,
-        //Box::new(Oscillator::new(880.0)) as Box<dyn Voice>,
-        //Box::new(Oscillator::new(1320.0)) as Box<dyn Voice>,
-    ]));
-
-    let sink = AlsaSink::new(args.pcm_name, track);
+    let track = RealTimeVoice::new(HashMap::<u8, Oscillator>::new());
+    let _sink = AlsaSink::new(args.pcm_name, track.clone());
 
     let seq = alsa::Seq::open(None, None, false).unwrap();
     seq.set_client_name(&CString::new("elda").unwrap()).unwrap();
@@ -63,7 +58,22 @@ fn main() {
         seq.subscribe_port(&subscribe).unwrap();
     }
 
-    loop {
-        log::info!("input: {:?}", input.event_input());
+    while let Ok(event) = input.event_input() {
+        log::info!("input: {:?}", event);
+
+        match event.get_type() {
+            EventType::Noteon => {
+                let data: EvNote = event.get_data().unwrap();
+                let base_frequency = 440.0;
+                let delta = data.note as i32 - 57;
+                let frequency = base_frequency * 2f64.powf(delta as f64 / 12.0);
+                track.get().insert(data.note, Oscillator::new(frequency));
+            }
+            EventType::Noteoff => {
+                let data: EvNote = event.get_data().unwrap();
+                track.get().remove(&data.note);
+            }
+            _ => {}
+        }
     }
 }

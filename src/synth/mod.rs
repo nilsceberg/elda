@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     f64::consts::TAU,
     sync::{Arc, Mutex, MutexGuard},
 };
@@ -79,5 +80,17 @@ impl<V> RealTimeVoice<V> {
 impl<V: Voice> Voice for RealTimeVoice<V> {
     fn sample(&mut self, dt: f32) -> Option<Sample> {
         self.get().sample(dt)
+    }
+}
+
+impl Voice for Box<dyn Voice> {
+    fn sample(&mut self, dt: f32) -> Option<Sample> {
+        self.as_mut().sample(dt)
+    }
+}
+
+impl<K: Send, V: Voice> Voice for HashMap<K, V> {
+    fn sample(&mut self, dt: f32) -> Option<Sample> {
+        Some(self.values_mut().filter_map(|v| v.sample(dt)).sum())
     }
 }

@@ -51,7 +51,7 @@ fn run(device_name: String, mut voice: impl Voice, stop: Arc<AtomicBool>) {
         .unwrap();
     log::info!("set sampling rate to {} Hz", exact_rate);
 
-    let period_size = 8192;
+    let period_size = 512;
     let num_periods = 2;
     let num_channels = 2;
     let frame_size = num_channels * 2;
@@ -73,11 +73,11 @@ fn run(device_name: String, mut voice: impl Voice, stop: Arc<AtomicBool>) {
     let io = device.io_i16().unwrap();
     let mut data = Vec::<i16>::with_capacity(frames_per_period as usize);
     let dt = 1.0 / exact_rate as f32;
-    let gain = (i16::MAX / 4) as f32;
+    let gain = (i16::MAX / 6) as f32;
     while !stop.load(Ordering::Relaxed) {
         data.clear();
         for _ in 0..frames_per_period {
-            let sample = voice.sample(dt).unwrap_or(0.0) * gain;
+            let sample = (voice.sample(dt).unwrap_or(0.0) * gain).round();
             data.push(sample as i16);
             data.push(sample as i16);
         }
