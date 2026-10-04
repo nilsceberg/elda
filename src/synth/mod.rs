@@ -56,8 +56,9 @@ impl Waveform {
 }
 
 pub struct Oscillator {
-    waveform: Waveform,
-    frequency: f64,
+    pub waveform: Waveform,
+    pub frequency: f64,
+    pub transpose: f64,
     phase: f64,
 }
 
@@ -83,6 +84,7 @@ impl Oscillator {
         Oscillator {
             waveform,
             frequency,
+            transpose: 1.0,
             phase: 0.0,
         }
     }
@@ -91,7 +93,7 @@ impl Oscillator {
 impl Voice for Oscillator {
     fn sample(&mut self, dt: f64) -> Option<Sample> {
         let sample = self.waveform.sample(self.phase);
-        self.phase = (self.phase + dt * self.frequency).fract();
+        self.phase = (self.phase + dt * self.frequency * self.transpose).fract();
         Some(sample as Sample)
     }
 }

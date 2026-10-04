@@ -59,6 +59,7 @@ fn main() {
     }
 
     let mut waveform = Waveform::Saw;
+    let mut transpose = 1.0;
     while let Ok(event) = input.event_input() {
         log::info!("input: {:?}", event);
 
@@ -68,14 +69,22 @@ fn main() {
                 let base_frequency = 440.0;
                 let delta = data.note as i32 - 57;
                 let frequency = base_frequency * 2f64.powf(delta as f64 / 12.0);
-                let note = Oscillator::new(waveform, frequency);
+                let mut note = Oscillator::new(waveform, frequency);
+                note.transpose = transpose;
                 voices
                     .get()
-                    .insert(data.note, DurationEnvelope::new(note, 1.0));
+                    .insert(data.note, DurationEnvelope::new(note, 10.0));
             }
             EventType::Noteoff => {
                 let data: EvNote = event.get_data().unwrap();
                 log::info!("removed: {:?}", voices.get().remove(&data.note).is_some());
+            }
+            EventType::Pitchbend => {
+                let data: EvCtrl = event.get_data().unwrap();
+                transpose = 1.0 + 0.5 * (data.value as f64 / 8192.0);
+                for note in voices.get().values_mut() {
+                    note.voice.transpose = transpose;
+                }
             }
             EventType::Controller => {
                 let data: EvCtrl = event.get_data().unwrap();
