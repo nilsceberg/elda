@@ -69,7 +69,7 @@ fn main() {
                 let base_frequency = 440.0;
                 let delta = data.note as i32 - 57;
                 let frequency = base_frequency * 2f64.powf(delta as f64 / 12.0);
-                let mut note = Oscillator::new(waveform, frequency);
+                let mut note = Oscillator::new(waveform, frequency, data.velocity as f64 / 100.0);
                 note.transpose = transpose;
                 voices
                     .get()
