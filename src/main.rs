@@ -4,7 +4,7 @@ use alsa::seq::{Addr, EvCtrl, EvNote, EventType, PortCap, PortSubscribe, PortTyp
 use clap::Parser;
 use elda::{
     sink::alsa::AlsaSink,
-    synth::{AdsrEnvelope, Oscillator, RealTimeVoice, Waveform},
+    synth::{AdsrEnvelope, Oscillator, RealTimeVoice, Voice, Waveform},
 };
 
 #[derive(Parser)]
@@ -71,10 +71,10 @@ fn main() {
                     let base_frequency = 440.0;
                     let delta = data.note as i32 - 57;
                     let frequency = base_frequency * 2f64.powf(delta as f64 / 12.0);
-                    let mut note = Oscillator::new(waveform, frequency, 1.0);
-                    note.transpose = transpose;
+                    let note = Oscillator::new(waveform, frequency, 1.0);
                     AdsrEnvelope::new(note, 0.01, 0.7, 0.2, 0.5)
                 });
+                note.transpose(transpose);
                 note.voice.amplitude = data.velocity as f64 / 64.0;
                 note.attack();
             }
@@ -87,9 +87,7 @@ fn main() {
             EventType::Pitchbend => {
                 let data: EvCtrl = event.get_data().unwrap();
                 transpose = 1.0 + 0.5 * (data.value as f64 / 8192.0);
-                for note in voices.get().values_mut() {
-                    note.voice.transpose = transpose;
-                }
+                voices.get().transpose(transpose);
             }
             EventType::Controller => {
                 let data: EvCtrl = event.get_data().unwrap();

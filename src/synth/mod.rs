@@ -8,6 +8,7 @@ pub type Sample = f32;
 
 pub trait Voice {
     fn sample(&mut self, dt: f64) -> Option<Sample>;
+    fn transpose(&mut self, factor: f64);
 }
 
 pub struct DurationEnvelope<V> {
@@ -114,6 +115,10 @@ impl<V: Voice> Voice for AdsrEnvelope<V> {
 
         Some(sample * self.amplitude as f32)
     }
+
+    fn transpose(&mut self, factor: f64) {
+        self.voice.transpose(factor);
+    }
 }
 
 impl<V> DurationEnvelope<V> {
@@ -131,6 +136,10 @@ impl<V: Voice> Voice for DurationEnvelope<V> {
             self.duration -= dt;
             sample
         }
+    }
+
+    fn transpose(&mut self, factor: f64) {
+        self.voice.transpose(factor);
     }
 }
 
@@ -181,6 +190,12 @@ impl Voice for Track {
                 .sum(),
         )
     }
+
+    fn transpose(&mut self, factor: f64) {
+        for voice in &mut self.voices {
+            voice.transpose(factor);
+        }
+    }
 }
 
 impl Oscillator {
@@ -200,6 +215,10 @@ impl Voice for Oscillator {
         let sample = self.amplitude * self.waveform.sample(self.phase);
         self.phase = (self.phase + dt * self.frequency * self.transpose).fract();
         Some(sample as Sample)
+    }
+
+    fn transpose(&mut self, factor: f64) {
+        self.transpose = factor;
     }
 }
 
@@ -231,11 +250,19 @@ impl<V: Voice> Voice for RealTimeVoice<V> {
     fn sample(&mut self, dt: f64) -> Option<Sample> {
         self.get().sample(dt)
     }
+
+    fn transpose(&mut self, factor: f64) {
+        self.get().transpose(factor);
+    }
 }
 
 impl Voice for Box<dyn Voice> {
     fn sample(&mut self, dt: f64) -> Option<Sample> {
         self.as_mut().sample(dt)
+    }
+
+    fn transpose(&mut self, factor: f64) {
+        self.as_mut().transpose(factor);
     }
 }
 
@@ -252,6 +279,12 @@ impl<V: Voice> Voice for Vec<V> {
         });
         Some(sample)
     }
+
+    fn transpose(&mut self, factor: f64) {
+        for voice in self {
+            voice.transpose(factor);
+        }
+    }
 }
 
 impl<K: Send, V: Voice> Voice for HashMap<K, V> {
@@ -266,5 +299,11 @@ impl<K: Send, V: Voice> Voice for HashMap<K, V> {
             }
         });
         Some(sample)
+    }
+
+    fn transpose(&mut self, factor: f64) {
+        for voice in self.values_mut() {
+            voice.transpose(factor);
+        }
     }
 }
