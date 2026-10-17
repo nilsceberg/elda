@@ -3,6 +3,7 @@ use std::{collections::HashMap, ffi::CString};
 use alsa::seq::{Addr, EvCtrl, EvNote, EventType, PortCap, PortSubscribe, PortType};
 use clap::Parser;
 use elda::{
+    music::{EQUAL_TEMPERAMENT, Interval, Pitch, Tuning},
     sink::alsa::AlsaSink,
     synth::{AdsrEnvelope, Oscillator, RealTimeVoice, Voice, Waveform},
 };
@@ -58,6 +59,8 @@ fn main() {
         seq.subscribe_port(&subscribe).unwrap();
     }
 
+    let tuning = EQUAL_TEMPERAMENT;
+
     let mut waveform = Waveform::Saw;
     let mut transpose = 1.0;
     while let Ok(event) = input.event_input() {
@@ -68,10 +71,11 @@ fn main() {
                 let data: EvNote = event.get_data().unwrap();
                 let mut voices = voices.get();
                 let note = voices.entry(data.note).or_insert_with(|| {
-                    let base_frequency = 440.0;
-                    let delta = data.note as i32 - 57;
-                    let frequency = base_frequency * 2f64.powf(delta as f64 / 12.0);
-                    let note = Oscillator::new(waveform, frequency, 1.0);
+                    let middle_a = 57;
+                    let interval = Pitch::interval(data.note as i32 - middle_a);
+                    let frequency = tuning.frequency(interval);
+                    log::info!("f: {}", frequency.0);
+                    let note = Oscillator::new(waveform, frequency.0, 1.0);
                     AdsrEnvelope::new(note, 0.01, 0.7, 0.2, 0.5)
                 });
                 note.transpose(transpose);
