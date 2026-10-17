@@ -4,7 +4,7 @@ use alsa::seq::{EvCtrl, EvNote, EventType};
 use clap::Parser;
 use elda::{
     midi::MidiClient,
-    music::{EQUAL_TEMPERAMENT, Pitch, Tuning},
+    music::{EQUAL_TEMPERAMENT, Pitch, Tuning, song::Song},
     sink::alsa::AlsaSink,
     synth::{AdsrEnvelope, Oscillator, RealTimeVoice, Voice, Waveform},
 };
@@ -26,7 +26,7 @@ fn main() {
 
     let args = Args::parse();
 
-    let voices = RealTimeVoice::new(HashMap::<u8, _>::new());
+    let voices = RealTimeVoice::new((HashMap::<u8, _>::new(), Song::empty()));
     let _sink = AlsaSink::new(args.pcm_name, voices.clone());
 
     let mut client = MidiClient::new("elda");
@@ -46,7 +46,7 @@ fn main() {
             EventType::Noteon => {
                 let data: EvNote = event.get_data().unwrap();
                 let mut voices = voices.get();
-                let note = voices.entry(data.note).or_insert_with(|| {
+                let note = voices.0.entry(data.note).or_insert_with(|| {
                     let middle_a = 57;
                     let interval = Pitch::interval(data.note as i32 - middle_a);
                     let frequency = tuning.frequency(interval);
@@ -60,7 +60,7 @@ fn main() {
             }
             EventType::Noteoff => {
                 let data: EvNote = event.get_data().unwrap();
-                if let Some(envelope) = voices.get().get_mut(&data.note) {
+                if let Some(envelope) = voices.get().0.get_mut(&data.note) {
                     envelope.release();
                 }
             }
@@ -90,7 +90,7 @@ fn main() {
                     }
                     _ => {}
                 }
-                voices.get().clear();
+                voices.get().0.clear();
             }
             _ => {}
         }

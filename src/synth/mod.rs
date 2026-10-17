@@ -143,10 +143,6 @@ impl<V: Voice> Voice for DurationEnvelope<V> {
     }
 }
 
-pub struct Track {
-    voices: Vec<Box<dyn Voice>>,
-}
-
 #[derive(Clone, Copy)]
 pub enum Waveform {
     Saw,
@@ -167,35 +163,33 @@ impl Waveform {
     }
 }
 
+pub struct DecayEnvelope<V> {
+    pub inner: V,
+    pub amplitude: f64,
+    pub decay: f64,
+}
+
+impl<V: Voice> Voice for DecayEnvelope<V> {
+    fn sample(&mut self, dt: f64) -> Option<Sample> {
+        self.amplitude -= dt / self.decay;
+        if self.amplitude < 0.0 {
+            None
+        } else {
+            self.inner.sample(dt).map(|s| s * self.amplitude as f32)
+        }
+    }
+
+    fn transpose(&mut self, factor: f64) {
+        self.inner.transpose(factor);
+    }
+}
+
 pub struct Oscillator {
     pub waveform: Waveform,
     pub frequency: f64,
     pub transpose: f64,
     pub amplitude: f64,
-    phase: f64,
-}
-
-impl From<Vec<Box<dyn Voice>>> for Track {
-    fn from(voices: Vec<Box<dyn Voice>>) -> Self {
-        Track { voices }
-    }
-}
-
-impl Voice for Track {
-    fn sample(&mut self, dt: f64) -> Option<Sample> {
-        Some(
-            self.voices
-                .iter_mut()
-                .filter_map(|voice| voice.sample(dt))
-                .sum(),
-        )
-    }
-
-    fn transpose(&mut self, factor: f64) {
-        for voice in &mut self.voices {
-            voice.transpose(factor);
-        }
-    }
+    pub phase: f64,
 }
 
 impl Oscillator {
@@ -256,7 +250,7 @@ impl<V: Voice> Voice for RealTimeVoice<V> {
     }
 }
 
-impl Voice for Box<dyn Voice> {
+impl Voice for Box<dyn Voice + Send> {
     fn sample(&mut self, dt: f64) -> Option<Sample> {
         self.as_mut().sample(dt)
     }
@@ -305,5 +299,21 @@ impl<K: Send, V: Voice> Voice for HashMap<K, V> {
         for voice in self.values_mut() {
             voice.transpose(factor);
         }
+    }
+}
+
+impl<A: Voice, B: Voice> Voice for (A, B) {
+    fn sample(&mut self, dt: f64) -> Option<Sample> {
+        match (self.0.sample(dt), self.1.sample(dt)) {
+            (Some(a), Some(b)) => Some(a + b),
+            (Some(a), None) => Some(a),
+            (None, Some(b)) => Some(b),
+            (None, None) => None,
+        }
+    }
+
+    fn transpose(&mut self, factor: f64) {
+        self.0.transpose(factor);
+        self.1.transpose(factor);
     }
 }

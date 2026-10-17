@@ -1,3 +1,5 @@
+pub mod song;
+
 /// 12-tone equal temperament based on middle A.
 pub const EQUAL_TEMPERAMENT: EqualTemperament = EqualTemperament {
     base: 440.0,
@@ -19,7 +21,13 @@ pub enum Pitch {
 #[derive(Clone, Copy)]
 pub enum Duration {
     Seconds(f32),
-    Beats(f32),
+    Bars(f32),
+}
+
+#[derive(Clone, Copy)]
+pub struct Note {
+    pub pitch: Pitch,
+    pub duration: Duration,
 }
 
 impl Pitch {
