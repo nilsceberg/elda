@@ -1,9 +1,10 @@
-use std::{collections::HashMap, ffi::CString};
+use std::collections::HashMap;
 
-use alsa::seq::{Addr, EvCtrl, EvNote, EventType, PortCap, PortSubscribe, PortType};
+use alsa::seq::{EvCtrl, EvNote, EventType};
 use clap::Parser;
 use elda::{
-    music::{EQUAL_TEMPERAMENT, Interval, Pitch, Tuning},
+    midi::MidiClient,
+    music::{EQUAL_TEMPERAMENT, Pitch, Tuning},
     sink::alsa::AlsaSink,
     synth::{AdsrEnvelope, Oscillator, RealTimeVoice, Voice, Waveform},
 };
@@ -28,41 +29,16 @@ fn main() {
     let voices = RealTimeVoice::new(HashMap::<u8, _>::new());
     let _sink = AlsaSink::new(args.pcm_name, voices.clone());
 
-    let seq = alsa::Seq::open(None, None, false).unwrap();
-    seq.set_client_name(&CString::new("elda").unwrap()).unwrap();
-    let port_id = seq
-        .create_simple_port(
-            &CString::new("elda").unwrap(),
-            PortCap::WRITE | PortCap::SUBS_WRITE | PortCap::READ | PortCap::SUBS_READ,
-            PortType::APPLICATION,
-        )
-        .unwrap();
-    let mut input = seq.input();
-
-    if let Some(port) = args.midi_port {
-        let (src_id, src_port_id) = port.split_once(":").expect("failed to parse MIDI port");
-        let src_id: i32 = src_id.parse().expect("failed to parse MIDI source ID");
-        let src_port_id: i32 = src_port_id
-            .parse()
-            .expect("failed to parse MIDI source port ID");
-
-        let subscribe = PortSubscribe::empty().unwrap();
-        subscribe.set_sender(Addr {
-            client: src_id,
-            port: src_port_id,
-        });
-        subscribe.set_dest(Addr {
-            client: seq.client_id().unwrap(),
-            port: port_id,
-        });
-
-        seq.subscribe_port(&subscribe).unwrap();
+    let mut client = MidiClient::new("elda");
+    if let Some(midi_port) = args.midi_port {
+        client.connect(&midi_port);
     }
 
     let tuning = EQUAL_TEMPERAMENT;
-
     let mut waveform = Waveform::Saw;
     let mut transpose = 1.0;
+
+    let mut input = client.input();
     while let Ok(event) = input.event_input() {
         log::info!("input: {:?}", event);
 
